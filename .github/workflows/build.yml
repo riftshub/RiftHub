@@ -15,7 +15,6 @@ jobs:
       - name: Automatically Extract Client ZIP
         run: |
           unzip -o client.zip -d client_extracted
-          # Correctly shifts the extracted subfolders into alignment
           if [ -d "client_extracted/client" ]; then
             mv client_extracted/client ./client
           else
@@ -39,6 +38,18 @@ jobs:
         working-directory: ./client
         run: pnpm install --no-frozen-lockfile
 
+      - name: Force-Install Missing Mineflayer Plugin
+        working-directory: ./client
+        run: pnpm add @nxg-org/mineflayer-util-plugin -D
+
+      - name: Install Missing TS Execution Packages
+        working-directory: ./client
+        run: pnpm add -g tsx
+
+      - name: Generate Optimized Minecraft Texture Data
+        working-directory: ./client
+        run: pnpm prepare-project
+
       - name: Run Clean Build
         working-directory: ./client
         env:
@@ -48,9 +59,10 @@ jobs:
           pnpm dlx update-browserslist-db@latest --yes
           pnpm run build
 
-      - name: Manual Force-Sync Correct Asset Folder Path
+      - name: Manual Force-Sync Assets & Global Config
         run: |
-          # Forcefully mirrors your loose block models and font maps into the final production web build
+          # CRITICAL: Copies config.json alongside asset directories into production distribution root
+          [ -f "client/config.json" ] && cp client/config.json client/dist/ || true
           [ -d "client/assets" ] && cp -r client/assets client/dist/ || true
           [ -d "client/public" ] && cp -r client/public/* client/dist/ || true
 
