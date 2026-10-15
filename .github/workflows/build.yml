@@ -15,6 +15,7 @@ jobs:
       - name: Automatically Extract Client ZIP
         run: |
           unzip -o client.zip -d client_extracted
+          # Correctly shifts the extracted subfolders into alignment
           if [ -d "client_extracted/client" ]; then
             mv client_extracted/client ./client
           else
@@ -47,12 +48,11 @@ jobs:
           pnpm dlx update-browserslist-db@latest --yes
           pnpm run build
 
-      - name: Manual Force-Sync Missing Asset Folders
+      - name: Manual Force-Sync Correct Asset Folder Path
         run: |
-          # Automatically detects and copies missing asset folders directly into your final web build
-          [ -d "client/public" ] && cp -r client/public/* client/dist/ || true
+          # Forcefully mirrors your loose block models and font maps into the final production web build
           [ -d "client/assets" ] && cp -r client/assets client/dist/ || true
-          [ -d "client/textures" ] && cp -r client/textures client/dist/ || true
+          [ -d "client/public" ] && cp -r client/public/* client/dist/ || true
 
       - name: Package Complete Dist Folder
         uses: actions/upload-artifact@v4
