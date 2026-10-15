@@ -1,0 +1,48 @@
+name: Compile Minecraft Game
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: # Adds a manual "Run workflow" button to your GitHub interface
+
+jobs:
+  build_game:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm Package Manager
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js (Forcing Node 22)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install Project Dependencies (via pnpm)
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Force-Install Missing Mineflayer Plugin
+        run: pnpm add @nxg-org/mineflayer-util-plugin -D
+
+      - name: Install Missing TS Execution Packages
+        run: pnpm add -g tsx
+
+      - name: Run Clean Build (With High Memory Allocation)
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+          NODE_ENV: production
+        run: |
+          pnpm dlx update-browserslist-db@latest --yes
+          pnpm run build
+
+      - name: Package Dist Folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: finished-porkbun-game
+          path: dist/
+          
