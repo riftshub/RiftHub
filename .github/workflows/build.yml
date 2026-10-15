@@ -12,8 +12,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Automatically Extract Client ZIP
+        run: |
+          unzip -o client.zip -d client_extracted
+          # This handles whether the zip had a subfolder or loose files
+          if [ -d "client_extracted/client" ]; then
+            mv client_extracted/client ./client
+          else
+            mv client_extracted ./client
+          fi
+          rm client.zip
+
       - name: Install pnpm Package Manager
-        uses: pnpm/action-setup@v4 # Upgraded to version 4 to support modern Node environments natively
+        uses: pnpm/action-setup@v4
         with:
           version: 9
 
@@ -22,10 +33,10 @@ jobs:
         with:
           node-version: 22
           cache: 'pnpm'
-          cache-dependency-path: 'client/pnpm-lock.yaml' # Explicitly guides GitHub to find your lock file inside the client subfolder
+          cache-dependency-path: 'client/pnpm-lock.yaml'
 
       - name: Install Project Dependencies (via pnpm)
-        working-directory: ./client # Forces the installation pipeline to run inside your game engine folder
+        working-directory: ./client
         run: pnpm install --no-frozen-lockfile
 
       - name: Force-Install Missing Mineflayer Plugin
@@ -36,7 +47,7 @@ jobs:
         working-directory: ./client
         run: pnpm add -g tsx
 
-      - name: Run Clean Build (With Folder Directives)
+      - name: Run Clean Build
         working-directory: ./client
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
@@ -49,4 +60,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: finished-porkbun-game
-          path: client/dist/ # Explicitly targets the compiled web files inside your subfolder structure
+          path: client/dist/
