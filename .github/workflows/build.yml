@@ -3,7 +3,7 @@ name: Compile Minecraft Game
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch: # Adds a manual "Run workflow" button to your GitHub interface
+  workflow_dispatch: 
 
 jobs:
   build_game:
@@ -13,26 +13,31 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install pnpm Package Manager
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4 # Upgraded to version 4 to support modern Node environments natively
         with:
           version: 9
 
-      - name: Setup Node.js (Forcing Node 22)
+      - name: Setup Node.js Engine
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
+          cache-dependency-path: 'client/pnpm-lock.yaml' # Explicitly guides GitHub to find your lock file inside the client subfolder
 
       - name: Install Project Dependencies (via pnpm)
+        working-directory: ./client # Forces the installation pipeline to run inside your game engine folder
         run: pnpm install --no-frozen-lockfile
 
       - name: Force-Install Missing Mineflayer Plugin
+        working-directory: ./client
         run: pnpm add @nxg-org/mineflayer-util-plugin -D
 
       - name: Install Missing TS Execution Packages
+        working-directory: ./client
         run: pnpm add -g tsx
 
-      - name: Run Clean Build (With High Memory Allocation)
+      - name: Run Clean Build (With Folder Directives)
+        working-directory: ./client
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
           NODE_ENV: production
@@ -44,5 +49,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: finished-porkbun-game
-          path: dist/
-          
+          path: client/dist/ # Explicitly targets the compiled web files inside your subfolder structure
