@@ -71,6 +71,9 @@ jobs:
         working-directory: ./client
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+          # Bake the config into the game's JavaScript, so the site doesn't need to serve config.json
+          # (fixes "Failed to load app config.json" on static hosts like Porkbun)
+          CONFIG_JSON_SOURCE: BUNDLED
         run: |
           # The project's supported way to override config.json at build time
           export CONFIG_JSON="$(jq -nc --arg ip "$GAME_SERVER/mc" '{
@@ -83,7 +86,7 @@ jobs:
       - name: Check the build
         run: |
           test -f client/dist/index.html || { echo "::error::client/dist/index.html missing"; exit 1; }
-          grep -q "${GAME_SERVER}/mc" client/dist/config.json || { echo "::error::server address missing from dist/config.json"; exit 1; }
+          grep -rqF "${GAME_SERVER}/mc" client/dist --include=*.js || { echo "::error::server address missing from the built game"; exit 1; }
           echo "Build OK: $(find client/dist -type f | wc -l) files"
 
       - name: Upload the finished site
