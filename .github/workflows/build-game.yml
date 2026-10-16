@@ -8,7 +8,7 @@ on:
 env:
   # ⬇️ Your Render server's address (shown at the top of the service page on Render),
   #    starting with wss:// and with no trailing slash.
-  GAME_SERVER: wss://YOUR-APP-NAME.onrender.com
+  GAME_SERVER: wss://gl-tahx.onrender.com
 
 jobs:
   build_game:
