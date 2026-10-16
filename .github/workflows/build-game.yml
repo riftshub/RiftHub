@@ -1,0 +1,93 @@
+name: Compile Minecraft Game
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  # ⬇️ Your Render server's address (shown at the top of the service page on Render),
+  #    starting with wss:// and with no trailing slash.
+  GAME_SERVER: wss://YOUR-APP-NAME.onrender.com
+
+jobs:
+  build_game:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check the server address is set
+        run: |
+          case "$GAME_SERVER" in
+            *YOUR-APP-NAME*) echo "::error::Edit GAME_SERVER at the top of this workflow to your Render address"; exit 1 ;;
+            wss://*) echo "Game server: $GAME_SERVER" ;;
+            *) echo "::error::GAME_SERVER must start with wss:// (got: $GAME_SERVER)"; exit 1 ;;
+          esac
+
+      # Works whether you uploaded the project as folders or as game.zip / client.zip
+      - name: Unpack uploaded zip (if any)
+        run: |
+          if [ -f game.zip ]; then
+            rm -rf client _unzipped
+            unzip -q -o game.zip -d _unzipped
+            mv _unzipped/game/client ./client
+            rm -rf _unzipped
+          elif [ -f client.zip ]; then
+            rm -rf client _unzipped
+            unzip -q -o client.zip -d _unzipped
+            if [ -d _unzipped/client ]; then mv _unzipped/client ./client; else mv _unzipped ./client; fi
+            rm -rf _unzipped
+          fi
+          test -f client/package.json || { echo "::error::client/package.json not found"; exit 1; }
+
+      - name: Point the game at the server
+        run: |
+          sed -i "s#^export const GAME_SERVER_ORIGIN = .*#export const GAME_SERVER_ORIGIN = '${GAME_SERVER}'#" client/src/gameServer.ts
+          grep -n "GAME_SERVER_ORIGIN = " client/src/gameServer.ts
+
+      # Uses the exact pnpm version the project asks for (packageManager in client/package.json)
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: client/package.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: client/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: ./client
+        run: pnpm install --no-frozen-lockfile
+
+      # The build runs helper scripts with `tsx`
+      - name: Install tsx
+        run: npm install -g tsx
+
+      - name: Build
+        working-directory: ./client
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          # The project's supported way to override config.json at build time
+          export CONFIG_JSON="$(jq -nc --arg ip "$GAME_SERVER/mc" '{
+            promoteServers: [{ ip: $ip, name: "True Element", description: "Cars & guns multiplayer world", version: "1.18" }],
+            allowAutoConnect: true,
+            multiplayerRoom: true
+          }')"
+          pnpm run build
+
+      - name: Check the build
+        run: |
+          test -f client/dist/index.html || { echo "::error::client/dist/index.html missing"; exit 1; }
+          grep -q "${GAME_SERVER}/mc" client/dist/config.json || { echo "::error::server address missing from dist/config.json"; exit 1; }
+          echo "Build OK: $(find client/dist -type f | wc -l) files"
+
+      - name: Upload the finished site
+        uses: actions/upload-artifact@v4
+        with:
+          name: finished-porkbun-game
+          path: client/dist/
