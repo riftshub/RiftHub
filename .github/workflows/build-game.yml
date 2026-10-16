@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  # ⬇️ Your Render server's address (shown at the top of the service page on Render),
+  # ⬇️ Yoour Render server's address (shown at the top of the service page on Render),
   #    starting with wss:// and with no trailing slash.
   GAME_SERVER: wss://gl-tahx.onrender.com
 
