@@ -89,21 +89,22 @@ jobs:
           grep -rqF "${GAME_SERVER}/mc" client/dist --include=*.js || { echo "::error::server address missing from the built game"; exit 1; }
           echo "Build OK: $(find client/dist -type f | wc -l) files"
 
-      # The extra games are plain HTML/JS: copy them into the site at /vertigo/ and /creeps/
-      # (gamekit/ holds the code they share: sound, character models, co-op networking)
-      - name: Add Vertigo Freight and Creeps
+      # The extra games are plain HTML/JS: copy them into the site at /vertigo/, /creeps/, /market/ and /lantern/
+      # (gamekit/ holds the code they share: sound, character models, co-op networking, fullscreen)
+      - name: Add the extra games
         run: |
-          for d in vertigo creeps gamekit; do
+          for d in vertigo creeps market lantern gamekit; do
             test -d "client/$d" || { echo "::error::client/$d is missing from the upload"; exit 1; }
           done
-          sed -i "s#^export const COOP_SERVER = .*#export const COOP_SERVER = '${GAME_SERVER}/vertigo'#" client/vertigo/js/config.js
-          sed -i "s#^export const COOP_SERVER = .*#export const COOP_SERVER = '${GAME_SERVER}/creeps'#" client/creeps/js/config.js
-          grep -n "COOP_SERVER = " client/vertigo/js/config.js client/creeps/js/config.js
-          for d in vertigo creeps gamekit; do
+          for g in vertigo creeps market lantern; do
+            sed -i "s#^export const COOP_SERVER = .*#export const COOP_SERVER = '${GAME_SERVER}/$g'#" "client/$g/js/config.js"
+            grep -n "COOP_SERVER = " "client/$g/js/config.js"
+          done
+          for d in vertigo creeps market lantern gamekit; do
             rm -rf "client/dist/$d"
             cp -r "client/$d" "client/dist/$d"
           done
-          echo "Added: $(find client/dist/vertigo client/dist/creeps client/dist/gamekit -type f | wc -l) files"
+          echo "Added: $(find client/dist/vertigo client/dist/creeps client/dist/market client/dist/lantern client/dist/gamekit -type f | wc -l) files"
 
       - name: Upload the finished site
         uses: actions/upload-artifact@v4
