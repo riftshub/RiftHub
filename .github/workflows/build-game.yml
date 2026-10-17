@@ -1,113 +1,40 @@
-name: Compile Minecraft Game
-
+name: Unzip and build APK
 on:
   push:
-    branches: [ main, master ]
   workflow_dispatch:
-
-env:
-  # ⬇️ Your Render server's address (shown at the top of the service page on Render),
-  #    starting with wss:// and with no trailing slash.
-  GAME_SERVER: wss://gl-tahx.onrender.com
-
+permissions:
+  contents: write
 jobs:
-  build_game:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Check the server address is set
+      - uses: actions/checkout@v4
+      - name: Unzip uploaded zip
         run: |
-          case "$GAME_SERVER" in
-            *YOUR-APP-NAME*) echo "::error::Edit GAME_SERVER at the top of this workflow to your Render address"; exit 1 ;;
-            wss://*) echo "Game server: $GAME_SERVER" ;;
-            *) echo "::error::GAME_SERVER must start with wss:// (got: $GAME_SERVER)"; exit 1 ;;
-          esac
-
-      # Works whether you uploaded the project as folders or as game.zip / client.zip
-      - name: Unpack uploaded zip (if any)
-        run: |
-          if [ -f game.zip ]; then
-            rm -rf client _unzipped
-            unzip -q -o game.zip -d _unzipped
-            mv _unzipped/game/client ./client
-            rm -rf _unzipped
-          elif [ -f client.zip ]; then
-            rm -rf client _unzipped
-            unzip -q -o client.zip -d _unzipped
-            if [ -d _unzipped/client ]; then mv _unzipped/client ./client; else mv _unzipped ./client; fi
-            rm -rf _unzipped
+          Z=$(ls *.zip 2>/dev/null | head -n1)
+          if [ -n "$Z" ]; then
+            unzip -oq "$Z" -d /tmp/z
+            D=$(dirname "$(find /tmp/z -maxdepth 3 -name package.json | head -n1)")
+            rm -rf "$D/.github"
+            cp -r "$D"/. .
+            git rm -q "$Z"
+            git config user.name github-actions
+            git config user.email github-actions@users.noreply.github.com
+            git add -A
+            git commit -m "Unzip game files"
+            git push
           fi
-          test -f client/package.json || { echo "::error::client/package.json not found"; exit 1; }
-
-      - name: Point the game at the server
-        run: |
-          sed -i "s#^export const GAME_SERVER_ORIGIN = .*#export const GAME_SERVER_ORIGIN = '${GAME_SERVER}'#" client/src/gameServer.ts
-          grep -n "GAME_SERVER_ORIGIN = " client/src/gameServer.ts
-
-      # Uses the exact pnpm version the project asks for (packageManager in client/package.json)
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
-          package_json_file: client/package.json
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+          node-version: 20
+      - uses: actions/setup-java@v4
         with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: client/pnpm-lock.yaml
-
-      - name: Install dependencies
-        working-directory: ./client
-        run: pnpm install --no-frozen-lockfile
-
-      # The build runs helper scripts with `tsx`
-      - name: Install tsx
-        run: npm install -g tsx
-
-      - name: Build
-        working-directory: ./client
-        env:
-          NODE_OPTIONS: --max-old-space-size=4096
-          # Bake the config into the game's JavaScript, so the site doesn't need to serve config.json
-          # (fixes "Failed to load app config.json" on static hosts like Porkbun)
-          CONFIG_JSON_SOURCE: BUNDLED
-        run: |
-          # The project's supported way to override config.json at build time
-          export CONFIG_JSON="$(jq -nc --arg ip "$GAME_SERVER/mc" '{
-            promoteServers: [{ ip: $ip, name: "True Element", description: "Cars & guns multiplayer world", version: "1.18" }],
-            allowAutoConnect: true,
-            multiplayerRoom: true
-          }')"
-          pnpm run build
-
-      - name: Check the build
-        run: |
-          test -f client/dist/index.html || { echo "::error::client/dist/index.html missing"; exit 1; }
-          grep -rqF "${GAME_SERVER}/mc" client/dist --include=*.js || { echo "::error::server address missing from the built game"; exit 1; }
-          echo "Build OK: $(find client/dist -type f | wc -l) files"
-
-      # The extra games are plain HTML/JS: copy them into the site at /vertigo/, /creeps/, /market/ and /lantern/
-      # (gamekit/ holds the code they share: sound, character models, co-op networking, fullscreen)
-      - name: Add the extra games
-        run: |
-          for d in vertigo creeps market lantern gamekit; do
-            test -d "client/$d" || { echo "::error::client/$d is missing from the upload"; exit 1; }
-          done
-          for g in vertigo creeps market lantern; do
-            sed -i "s#^export const COOP_SERVER = .*#export const COOP_SERVER = '${GAME_SERVER}/$g'#" "client/$g/js/config.js"
-            grep -n "COOP_SERVER = " "client/$g/js/config.js"
-          done
-          for d in vertigo creeps market lantern gamekit; do
-            rm -rf "client/dist/$d"
-            cp -r "client/$d" "client/dist/$d"
-          done
-          echo "Added: $(find client/dist/vertigo client/dist/creeps client/dist/market client/dist/lantern client/dist/gamekit -type f | wc -l) files"
-
-      - name: Upload the finished site
-        uses: actions/upload-artifact@v4
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - run: bash tools/android-setup.sh
+      - run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
         with:
-          name: finished-porkbun-game
-          path: client/dist/
+          name: backrooms-coop-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
