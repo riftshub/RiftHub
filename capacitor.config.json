@@ -1,0 +1,7 @@
+{
+  "appId": "com.backrooms.coop",
+  "appName": "Backrooms Co-op",
+  "webDir": "www",
+  "server": { "androidScheme": "https" },
+  "android": { "allowMixedContent": false, "backgroundColor": "#000000" }
+}

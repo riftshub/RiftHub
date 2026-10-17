@@ -1,0 +1,13 @@
+{
+  "name": "backrooms-coop",
+  "version": "1.0.0",
+  "description": "Backrooms co-op horror game: procedural levels, entities, synthesized audio. Web + Android (Capacitor).",
+  "type": "module",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "test": "node tools/test-mapgen.js && node tools/test-server.js"
+  },
+  "engines": { "node": ">=18" },
+  "license": "MIT"
+}
