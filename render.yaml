@@ -1,0 +1,10 @@
+# Render Blueprint: New > Blueprint > pick this repo. Or create a Web Service manually with the same commands.
+services:
+  - type: web
+    name: backrooms-coop
+    runtime: node
+    plan: free
+    buildCommand: echo "No build step - zero dependencies"
+    startCommand: node server/server.js
+    healthCheckPath: /health
+    autoDeploy: true
