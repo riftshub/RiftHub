@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  # ⬇️ Yoour Render server's address (shown at the top of the service page on Render),
+  # ⬇️ Your Render server's address (shown at the top of the service page on Render),
   #    starting with wss:// and with no trailing slash.
   GAME_SERVER: wss://gl-tahx.onrender.com
 
@@ -88,6 +88,22 @@ jobs:
           test -f client/dist/index.html || { echo "::error::client/dist/index.html missing"; exit 1; }
           grep -rqF "${GAME_SERVER}/mc" client/dist --include=*.js || { echo "::error::server address missing from the built game"; exit 1; }
           echo "Build OK: $(find client/dist -type f | wc -l) files"
+
+      # The extra games are plain HTML/JS: copy them into the site at /vertigo/ and /creeps/
+      # (gamekit/ holds the code they share: sound, character models, co-op networking)
+      - name: Add Vertigo Freight and Creeps
+        run: |
+          for d in vertigo creeps gamekit; do
+            test -d "client/$d" || { echo "::error::client/$d is missing from the upload"; exit 1; }
+          done
+          sed -i "s#^export const COOP_SERVER = .*#export const COOP_SERVER = '${GAME_SERVER}/vertigo'#" client/vertigo/js/config.js
+          sed -i "s#^export const COOP_SERVER = .*#export const COOP_SERVER = '${GAME_SERVER}/creeps'#" client/creeps/js/config.js
+          grep -n "COOP_SERVER = " client/vertigo/js/config.js client/creeps/js/config.js
+          for d in vertigo creeps gamekit; do
+            rm -rf "client/dist/$d"
+            cp -r "client/$d" "client/dist/$d"
+          done
+          echo "Added: $(find client/dist/vertigo client/dist/creeps client/dist/gamekit -type f | wc -l) files"
 
       - name: Upload the finished site
         uses: actions/upload-artifact@v4
